@@ -1,12 +1,6 @@
 using System.Globalization;
 
 namespace SolarMiner;
-
-/// <summary>
-/// Genera y carga los datos de energía de la cooperativa solar.
-/// Estas transacciones son el "mundo real" del proyecto (punto 6): los intercambios
-/// de kWh entre las casas que la blockchain debe registrar de forma confiable.
-/// </summary>
 public static class CooperativeData
 {
     private static readonly string[] Houses =
@@ -15,10 +9,7 @@ public static class CooperativeData
         "Casa-06", "Casa-07", "Casa-08", "Casa-09", "Casa-10"
     };
 
-    /// <summary>
-    /// Genera un lote de transacciones de energía simuladas pero realistas:
-    /// unas casas aportan energía (paneles produciendo de más) y otras consumen.
-    /// </summary>
+   
     public static List<EnergyTransaction> GenerateTransactions(int count, int seed = 42)
     {
         var random = new Random(seed);
@@ -28,7 +19,7 @@ public static class CooperativeData
         for (int i = 0; i < count; i++)
         {
             string house = Houses[random.Next(Houses.Length)];
-            // Más probabilidad de aportar en horas de sol (simulación simple).
+           
             string type = random.NextDouble() < 0.6 ? "APORTA" : "CONSUME";
             double kWh = Math.Round(0.5 + random.NextDouble() * 6.0, 2);
             var timestamp = baseTime.AddMinutes(i * 3);
@@ -39,7 +30,7 @@ public static class CooperativeData
         return transactions;
     }
 
-    /// <summary>Guarda las transacciones en un CSV (para tenerlas como dato de entrada).</summary>
+  
     public static void SaveToCsv(List<EnergyTransaction> transactions, string path)
     {
         using var writer = new StreamWriter(path);
@@ -52,13 +43,13 @@ public static class CooperativeData
         }
     }
 
-    /// <summary>Carga transacciones desde un CSV previamente generado.</summary>
+    
     public static List<EnergyTransaction> LoadFromCsv(string path)
     {
         var transactions = new List<EnergyTransaction>();
         var lines = File.ReadAllLines(path);
 
-        for (int i = 1; i < lines.Length; i++) // saltar cabecera
+        for (int i = 1; i < lines.Length; i++) 
         {
             var parts = lines[i].Split(',');
             if (parts.Length < 4) continue;

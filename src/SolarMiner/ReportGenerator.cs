@@ -1,0 +1,228 @@
+namespace SolarMiner;
+
+/// <summary>
+/// Genera una página HTML sencilla e interactiva para crear reportes de energía
+/// de la cooperativa (5 viviendas). El usuario elige el período (semanal, quincenal
+/// o mensual) y la página genera y descarga un CSV por cada trozo del período.
+/// La página es autónoma: se abre con doble clic, sin servidor.
+/// </summary>
+public static class ReportGenerator
+{
+    public static string BuildHtml() => HtmlTemplate;
+
+    private const string HtmlTemplate = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reportes de Energía — Cooperativa Solar</title>
+<style>
+  :root {
+    --bg:#0f1720; --panel:#16212e; --line:#24303f; --text:#e6edf3;
+    --muted:#8b98a5; --accent:#e0a33e; --accent2:#4aa3ff; --ok:#2ec07a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5; padding:32px 20px 80px; }
+  .wrap { max-width:820px; margin:0 auto; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 24px; font-size:15px; }
+  .card { background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:22px; margin-bottom:20px; }
+  .card h2 { font-size:16px; margin:0 0 14px; color:var(--accent); }
+  .houses { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  .house { background:#0d1620; border:1px solid var(--line); border-radius:8px;
+    padding:8px 14px; font-size:14px; }
+  .house b { color:var(--ok); }
+  .periods { display:flex; gap:12px; flex-wrap:wrap; margin-top:6px; }
+  .pbtn { flex:1; min-width:150px; background:#0d1620; border:1px solid var(--line);
+    border-radius:10px; padding:16px; cursor:pointer; text-align:center; transition:.15s; }
+  .pbtn:hover { border-color:var(--accent); }
+  .pbtn.active { border-color:var(--accent); background:#1c2530; }
+  .pbtn .t { font-weight:700; font-size:15px; }
+  .pbtn .d { color:var(--muted); font-size:13px; margin-top:4px; }
+  .gen { margin-top:8px; }
+  button.primary { background:var(--accent); color:#2a1e02; border:none;
+    border-radius:8px; padding:11px 20px; font-weight:700; cursor:pointer; font-size:15px; }
+  button.primary:hover { filter:brightness(1.08); }
+  .files { margin-top:8px; }
+  .file { display:flex; justify-content:space-between; align-items:center;
+    background:#0d1620; border:1px solid var(--line); border-radius:10px;
+    padding:12px 16px; margin-bottom:10px; }
+  .file .info { font-size:14px; }
+  .file .info .fn { font-weight:700; }
+  .file .info .meta { color:var(--muted); font-size:13px; }
+  button.dl { background:var(--accent2); color:#04223f; border:none; border-radius:8px;
+    padding:8px 14px; font-weight:700; cursor:pointer; font-size:13px; }
+  button.dl:hover { filter:brightness(1.08); }
+  .empty { color:var(--muted); font-size:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Reportes de Energía de la Cooperativa</h1>
+  <p class="sub">Genera reportes CSV de producción y consumo de energía solar por período.</p>
+
+  <div class="card">
+    <h2>Viviendas de la cooperativa</h2>
+    <div class="houses" id="houses"></div>
+  </div>
+
+  <div class="card">
+    <h2>1 · Elige el período del reporte</h2>
+    <div class="periods">
+      <div class="pbtn" data-p="semanal" onclick="selectPeriod('semanal', this)">
+        <div class="t">Semanal</div><div class="d">5 archivos (una por semana)</div></div>
+      <div class="pbtn" data-p="quincenal" onclick="selectPeriod('quincenal', this)">
+        <div class="t">Quincenal</div><div class="d">2 archivos (dos quincenas)</div></div>
+      <div class="pbtn" data-p="mensual" onclick="selectPeriod('mensual', this)">
+        <div class="t">Mensual</div><div class="d">1 archivo (mes completo)</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Genera y descarga los CSV</h2>
+    <div class="gen">
+      <button class="primary" onclick="generate()">Generar reporte</button>
+    </div>
+    <div class="files" id="files"><p class="empty">Elige un período y pulsa «Generar reporte».</p></div>
+  </div>
+</div>
+
+<script>
+// ====== Configuración de la cooperativa ======
+const HOUSES = ["Casa-01", "Casa-02", "Casa-03", "Casa-04", "Casa-05"];
+const START_DATE = new Date(2026, 7, 1); // 1 de agosto de 2026 (mes=7 => agosto)
+const DAYS_IN_MONTH = 30;
+let selectedPeriod = null;
+
+// Mostrar las viviendas
+document.getElementById("houses").innerHTML =
+  HOUSES.map(h => `<div class="house"><b>●</b> ${h}</div>`).join("");
+
+// ====== Generador de números pseudoaleatorio con semilla (reproducible) ======
+function seeded(seed) {
+  return function() {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function pad(n) { return String(n).padStart(2, "0"); }
+function fmtDate(d) {
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+
+// ====== Generar las filas de un rango de días [from, to] ======
+function generateRows(fromDay, toDay) {
+  const rows = [];
+  for (let day = fromDay; day <= toDay; day++) {
+    const date = new Date(START_DATE);
+    date.setDate(START_DATE.getDate() + day);
+    HOUSES.forEach((house, hi) => {
+      const rnd = seeded(day * 100 + hi);
+      // Producción solar: más alta, varía por día (simulación realista)
+      const produced = (2.5 + rnd() * 6).toFixed(2);
+      // Consumo: algo menor
+      const consumed = (1.5 + rnd() * 4).toFixed(2);
+      rows.push([fmtDate(date), house, "APORTA", produced]);
+      rows.push([fmtDate(date), house, "CONSUME", consumed]);
+    });
+  }
+  return rows;
+}
+
+// ====== Definir los trozos según el período ======
+function getChunks(period) {
+  if (period === "mensual")
+    return [{ label: "Mes completo", from: 0, to: 29, name: "reporte_mensual" }];
+  if (period === "quincenal")
+    return [
+      { label: "Quincena 1 (días 1–15)",  from: 0,  to: 14, name: "reporte_quincena_1" },
+      { label: "Quincena 2 (días 16–30)", from: 15, to: 29, name: "reporte_quincena_2" },
+    ];
+  // semanal
+  return [
+    { label: "Semana 1 (días 1–7)",   from: 0,  to: 6,  name: "reporte_semana_1" },
+    { label: "Semana 2 (días 8–14)",  from: 7,  to: 13, name: "reporte_semana_2" },
+    { label: "Semana 3 (días 15–21)", from: 14, to: 20, name: "reporte_semana_3" },
+    { label: "Semana 4 (días 22–28)", from: 21, to: 27, name: "reporte_semana_4" },
+    { label: "Semana 5 (días 29–30)", from: 28, to: 29, name: "reporte_semana_5" },
+  ];
+}
+
+function selectPeriod(p, el) {
+  selectedPeriod = p;
+  document.querySelectorAll(".pbtn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+}
+
+function toCsv(rows) {
+  let csv = "Fecha,Vivienda,Tipo,kWh\n";
+  for (const r of rows) csv += r.join(",") + "\n";
+  return csv;
+}
+
+function download(filename, csv) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function generate() {
+  if (!selectedPeriod) {
+    alert("Primero elige un período (semanal, quincenal o mensual).");
+    return;
+  }
+  const chunks = getChunks(selectedPeriod);
+  const filesEl = document.getElementById("files");
+  filesEl.innerHTML = "";
+
+  chunks.forEach(chunk => {
+    const rows = generateRows(chunk.from, chunk.to);
+    const csv = toCsv(rows);
+    const filename = chunk.name + ".csv";
+    const kwhTotal = rows
+      .filter(r => r[2] === "APORTA")
+      .reduce((s, r) => s + parseFloat(r[3]), 0)
+      .toFixed(1);
+
+    const div = document.createElement("div");
+    div.className = "file";
+    div.innerHTML = `
+      <div class="info">
+        <div class="fn">${filename}</div>
+        <div class="meta">${chunk.label} · ${rows.length} registros · ${HOUSES.length} viviendas · ${kwhTotal} kWh aportados</div>
+      </div>
+      <button class="dl">Descargar CSV</button>`;
+    div.querySelector(".dl").addEventListener("click", () => download(filename, csv));
+    filesEl.appendChild(div);
+  });
+
+  // Añadir un botón para descargar todos de una vez
+  const allBtn = document.createElement("button");
+  allBtn.className = "primary";
+  allBtn.style.marginTop = "6px";
+  allBtn.textContent = "Descargar todos";
+  allBtn.addEventListener("click", () => {
+    chunks.forEach((chunk, i) => {
+      setTimeout(() => {
+        const rows = generateRows(chunk.from, chunk.to);
+        download(chunk.name + ".csv", toCsv(rows));
+      }, i * 300); // pequeño retraso para que el navegador permita varias descargas
+    });
+  });
+  filesEl.appendChild(allBtn);
+}
+</script>
+</body>
+</html>
+""";
+}

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,5 +8,10 @@
     <AssemblyName>SolarMiner</AssemblyName>
     <RootNamespace>SolarMiner</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\..\..\Downloads\SolarMiner\SolarMiner (1)\SolarMiner\src\SolarMiner\Blockchain.cs" Link="Blockchain.cs" />
+    <Compile Include="..\..\..\..\..\Downloads\SolarMiner\SolarMiner (1)\SolarMiner\src\SolarMiner\HtmlVisor.cs" Link="HtmlVisor.cs" />
+  </ItemGroup>
 
 </Project>

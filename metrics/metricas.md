@@ -35,18 +35,18 @@ Las métricas registradas son el tiempo de sellado, la velocidad en MHash/s, la 
 
 La aceleración aumenta con el número de hilos, confirmando la ventaja del paralelismo. El crecimiento es pronunciado hasta los 8 hilos y luego se atenúa, lo que evidencia los rendimientos decrecientes al superar la capacidad real del procesador.
 
-
+![Aceleración](./Aceleracion.png)
 
 ### Eficiencia
 
 La eficiencia parte del 100% con un hilo y desciende progresivamente al añadir más, porque los hilos compiten por un número limitado de núcleos físicos. Esto ilustra el concepto de rendimientos decrecientes: cada hilo adicional aporta menos que el anterior.
 
-
+![Eficiencia](./Eficiencia.png)
 
 ### Tiempo de sellado
 
 El tiempo de sellado se reduce drásticamente al añadir hilos: en la dificultad 6 pasa de más de 7 segundos con un solo hilo a aproximadamente 1 segundo con 24 hilos. Esta gráfica traduce la ventaja del paralelismo a términos concretos de tiempo real.
 
-
+![Tiempo](./Tiempo.png)
 
 
